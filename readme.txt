@@ -1,0 +1,1 @@
+float phValue = 7 + ((2.5 - voltage) / 0.18);

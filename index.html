@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil pH Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:         #07090d;
+            --bg-card:    #0d1117;
+            --bg-raised:  #111827;
+            --border:     #1e2a3a;
+            --border-hi:  #243550;
+            --accent:     #0ea5e9;
+            --accent-dim: rgba(14, 165, 233, 0.1);
+            --text-1:     #e2e8f0;
+            --text-2:     #64748b;
+            --text-3:     #334155;
+            --ok:         #10b981;
+            --warn:       #f59e0b;
+            --err:        #ef4444;
+            --ok-dim:     rgba(16, 185, 129, 0.08);
+            --warn-dim:   rgba(245, 158, 11, 0.08);
+            --err-dim:    rgba(239, 68, 68, 0.08);
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text-1);
+            padding: 36px 24px 60px;
+        }
+
+        /* ── Header ─────────────────────────────────────── */
+        .topbar {
+            max-width: 1080px;
+            margin: 0 auto 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .topbar-left h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+            color: var(--text-1);
+        }
+
+        .topbar-left p {
+            margin-top: 3px;
+            font-size: 12px;
+            color: var(--text-2);
+            font-weight: 400;
+            letter-spacing: 0.1px;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-3);
+            letter-spacing: 0.5px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-3);
+            flex-shrink: 0;
+        }
+
+        .dot.live {
+            background: var(--ok);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+            animation: heartbeat 2.4s ease infinite;
+        }
+
+        @keyframes heartbeat {
+            0%   { box-shadow: 0 0 0 0   rgba(16,185,129,0.5); }
+            60%  { box-shadow: 0 0 0 5px rgba(16,185,129,0);   }
+            100% { box-shadow: 0 0 0 0   rgba(16,185,129,0);   }
+        }
+
+        /* ── Layout grid ─────────────────────────────────── */
+        .grid {
+            max-width: 1080px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        @media (max-width: 720px) {
+            .grid { grid-template-columns: 1fr; }
+            .full { grid-column: 1; }
+        }
+
+        .full { grid-column: 1 / -1; }
+
+        /* ── Card base ───────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 26px 28px;
+        }
+
+        .card-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            color: var(--text-3);
+            margin-bottom: 18px;
+        }
+
+        /* ── pH Reading Card ─────────────────────────────── */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border-radius: 2px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            background: var(--bg-raised);
+            border-left: 2px solid var(--text-3);
+            color: var(--text-2);
+            margin-bottom: 4px;
+        }
+
+        .status-bar.connected {
+            background: var(--ok-dim);
+            border-left-color: var(--ok);
+            color: var(--ok);
+        }
+
+        .status-bar.error {
+            background: var(--err-dim);
+            border-left-color: var(--err);
+            color: var(--err);
+        }
+
+        .ph-readout {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 86px;
+            font-weight: 300;
+            line-height: 1;
+            color: var(--text-1);
+            letter-spacing: -3px;
+            margin: 18px 0 22px;
+        }
+
+        .ph-readout .unit {
+            font-size: 18px;
+            font-weight: 400;
+            color: var(--text-2);
+            letter-spacing: 0;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+
+        /* pH scale */
+        .scale-wrap { margin-bottom: 22px; }
+
+        .scale-ticks {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            color: var(--text-3);
+            margin-bottom: 5px;
+            padding: 0 1px;
+        }
+
+        .scale-track {
+            height: 3px;
+            border-radius: 2px;
+            background: linear-gradient(to right,
+                #ef4444 0%,
+                #f97316 15%,
+                #eab308 30%,
+                #84cc16 45%,
+                #22c55e 55%,
+                #3b82f6 70%,
+                #6366f1 85%,
+                #8b5cf6 100%
+            );
+            position: relative;
+        }
+
+        .scale-cursor {
+            position: absolute;
+            top: -5px;
+            width: 1px;
+            height: 13px;
+            background: #fff;
+            transform: translateX(-50%);
+            transition: left 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 4px rgba(255,255,255,0.6);
+        }
+
+        .advice-line {
+            font-size: 13px;
+            line-height: 1.65;
+            color: var(--text-2);
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            font-weight: 400;
+        }
+
+        /* ── Soil Profile Card ───────────────────────────── */
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
+        .soil-select {
+            width: 100%;
+            padding: 9px 36px 9px 12px;
+            background: var(--bg-raised);
+            border: 1px solid var(--border-hi);
+            border-radius: 2px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-1);
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            transition: border-color 0.15s;
+        }
+
+        .soil-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .soil-select option { background: #111827; }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .metric {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 14px 16px;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-3);
+        }
+
+        .metric-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 26px;
+            font-weight: 400;
+            color: var(--accent);
+            margin-top: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        #phStatus {
+            font-size: 14px;
+            font-weight: 600;
+            padding-top: 5px;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── AI Analysis Card ────────────────────────────── */
+        .section-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            color: var(--text-3);
+            margin-bottom: 14px;
+        }
+
+        .section-head::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .analysis-content {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 18px 20px;
+            font-size: 13.5px;
+            line-height: 1.85;
+            color: var(--text-2);
+            min-height: 72px;
+            font-weight: 400;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .analysis-content p { color: var(--text-2); }
+
+        .loading-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-2);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+        }
+
+        .spinner {
+            width: 13px;
+            height: 13px;
+            border: 1.5px solid var(--border-hi);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="topbar">
+        <div class="topbar-left">
+            <h1>Soil pH Monitor</h1>
+            <p>Real-time electrochemical analysis — Arduino ESP32 via USB-UART</p>
+        </div>
+        <div class="live-badge">
+            <div class="dot" id="pulse-dot"></div>
+            <span id="connection-badge">OFFLINE</span>
+        </div>
+    </div>
+
+    <div class="grid">
+
+        <!-- pH Reading -->
+        <div class="card">
+            <div class="card-label">Live pH Reading</div>
+            <div class="status-bar" id="status">AWAITING SENSOR DATA</div>
+            <div class="ph-readout" id="ph-display">--<span class="unit">pH</span></div>
+
+            <div class="scale-wrap">
+                <div class="scale-ticks">
+                    <span>4</span><span>5</span><span>6</span><span>7</span>
+                    <span>8</span><span>9</span><span>10</span><span>11</span>
+                    <span>12</span><span>13</span><span>14</span>
+                </div>
+                <div class="scale-track">
+                    <div class="scale-cursor" id="ph-gauge-fill" style="left: 50%;"></div>
+                </div>
+            </div>
+
+            <div class="advice-line" id="advice">Connect sensor to receive analysis.</div>
+        </div>
+
+        <!-- Soil Profile -->
+        <div class="card">
+            <div class="card-label">Soil Profile</div>
+            <label class="field-label" for="soilType">Soil classification</label>
+            <select id="soilType" class="soil-select">
+                <option value="loam">Loam</option>
+                <option value="clay">Clay</option>
+                <option value="sand">Sand</option>
+                <option value="silt">Silt</option>
+                <option value="peat">Peat</option>
+                <option value="mixed">Mixed / Unknown</option>
+            </select>
+
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Optimal pH</div>
+                    <div class="metric-value" id="optimalPh">6.5</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Status</div>
+                    <div class="metric-value" id="phStatus">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="card full">
+            <div class="section-head">AI Analysis &amp; Recommendations</div>
+            <div class="analysis-content" id="aiContent">
+                <div class="loading-row">
+                    <div class="spinner"></div>
+                    <span>Waiting for soil data...</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const soilTypes = {
+            loam: { optimalPh: 6.5, min: 6.0, max: 7.0 },
+            clay: { optimalPh: 6.8, min: 6.0, max: 7.5 },
+            sand: { optimalPh: 6.0, min: 5.5, max: 6.5 },
+            silt: { optimalPh: 6.5, min: 6.0, max: 7.0 },
+            peat: { optimalPh: 5.0, min: 4.0, max: 6.0 },
+            mixed: { optimalPh: 6.5, min: 6.0, max: 7.0 }
+        };
+
+        let currentPh = null;
+        let lastPhWhole = null;
+        let isAnalyzing = false;
+
+        document.getElementById('soilType').addEventListener('change', () => {
+            updateOptimalPh();
+            if (currentPh !== null) {
+                fetchAiAnalysis();
+            }
+        });
+
+        function updateOptimalPh() {
+            const soilType = document.getElementById('soilType').value;
+            const optimal = soilTypes[soilType].optimalPh;
+            document.getElementById('optimalPh').innerText = optimal.toFixed(1);
+        }
+
+        async function fetchLatest() {
+            try {
+                const response = await fetch('http://localhost:5000/api/latest');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.ph_level !== null) {
+                    currentPh = data.ph_level;
+                    updatePhDisplay(data.ph_level);
+
+                    const currentPhWhole = Math.floor(data.ph_level);
+                    if (lastPhWhole === null || lastPhWhole !== currentPhWhole) {
+                        lastPhWhole = currentPhWhole;
+                        console.log(`pH crossed boundary: ${currentPhWhole}. Fetching AI analysis...`);
+                        fetchAiAnalysis();
+                    }
+                } else {
+                    document.getElementById('status').className = 'status-bar';
+                    document.getElementById('status').innerText = 'NO DATA AVAILABLE';
+                    document.getElementById('pulse-dot').className = 'dot';
+                    document.getElementById('connection-badge').innerText = 'OFFLINE';
+                }
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                document.getElementById('status').className = 'status-bar error';
+                document.getElementById('status').innerText = 'BRIDGE OFFLINE — localhost:5000 unreachable';
+                document.getElementById('pulse-dot').className = 'dot';
+                document.getElementById('connection-badge').innerText = 'ERROR';
+            }
+        }
+
+        function updatePhDisplay(ph) {
+            document.getElementById('ph-display').innerHTML = ph.toFixed(2) + '<span class="unit">pH</span>';
+            document.getElementById('status').className = 'status-bar connected';
+            document.getElementById('status').innerText = 'LIVE — Last update: ' + new Date().toLocaleTimeString();
+            document.getElementById('pulse-dot').className = 'dot live';
+            document.getElementById('connection-badge').innerText = 'LIVE';
+
+            const soilType = document.getElementById('soilType').value;
+            const optimal = soilTypes[soilType];
+
+            // Update scale cursor (pH 4–14 mapped to 0–100%)
+            const gaugePercent = ((ph - 4) / 10) * 100;
+            document.getElementById('ph-gauge-fill').style.left = Math.max(0, Math.min(100, gaugePercent)) + '%';
+
+            let status = 'ACIDIC';
+            let advice = 'Soil is too acidic. Add lime or wood ash to increase pH.';
+
+            if (ph < optimal.min) {
+                status = 'ACIDIC';
+                advice = `pH ${ph.toFixed(2)} is below the optimal range for ${soilType} (${optimal.min}–${optimal.max}). Apply agricultural lime, wood ash, or baking soda to raise pH.`;
+            } else if (ph > optimal.max) {
+                status = 'ALKALINE';
+                advice = `pH ${ph.toFixed(2)} is above the optimal range for ${soilType} (${optimal.min}–${optimal.max}). Apply elemental sulfur, peat moss, or aluminum sulfate to lower pH.`;
+            } else {
+                status = 'OPTIMAL';
+                advice = `pH ${ph.toFixed(2)} is within the optimal range for ${soilType} soil (${optimal.min}–${optimal.max}). Maintain current conditions.`;
+            }
+
+            document.getElementById('phStatus').innerText = status;
+            document.getElementById('advice').innerText = advice;
+        }
+
+        async function fetchAiAnalysis() {
+            if (currentPh === null || isAnalyzing) return;
+
+            isAnalyzing = true;
+            const soilType = document.getElementById('soilType').value;
+            const aiContent = document.getElementById('aiContent');
+
+            aiContent.innerHTML = '<div class="loading-row"><div class="spinner"></div><span>Analyzing soil data...</span></div>';
+
+            try {
+                const response = await fetch('http://localhost:5000/api/ai-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ph_level: currentPh,
+                        soil_type: soilType
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.analysis) {
+                    aiContent.innerHTML = `<p>${data.analysis}</p>`;
+                } else {
+                    aiContent.innerHTML = '<p style="color: #374151;">No analysis available.</p>';
+                }
+            } catch (err) {
+                console.error("Error fetching AI analysis:", err);
+                aiContent.innerHTML = '<p style="color: #ef4444;">Error: Unable to reach bridge server or API key not configured.</p>';
+            } finally {
+                isAnalyzing = false;
+            }
+        }
+
+        // Fetch immediately on page load
+        fetchLatest();
+
+        // Refresh every 3 seconds
+        setInterval(fetchLatest, 3000);
+    </script>
+</body>
+</html>
